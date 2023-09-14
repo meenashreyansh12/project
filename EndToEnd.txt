@@ -1,0 +1,84 @@
+pipeline
+{
+    agent any
+    stages
+    {
+        stage('Download')
+        {
+            steps
+            {
+                git 'https://github.com/intelliqittrainings/maven.git'
+            }
+        }
+         stage('Build')
+        {
+            steps
+            {
+                sh 'mvn package'
+            }
+        }
+        
+         stage('dokerfile design')
+         {
+             steps
+             {
+        
+               sh '''cat >dockerfile<<EOF
+FROM tomee
+MAINTAINER intelliqit
+
+COPY /webapp/target/webapp.war  /usr/local/tomee/webapps/javaapp.war
+EOF'''
+             }
+         }
+          stage('Docker image creation')
+        {
+            steps
+            {
+                
+                sh 'sudo docker build -t  meenakshigadiraju/javaapp1 .'
+                
+            }
+        }
+        stage('push dockerimage')
+        {
+            steps
+            {
+                script 
+                {
+                   sh 'echo Shreyansh21 | sudo docker login -u meenakshigadiraju --password-stdin'                		
+	echo 'Login Completed'
+                   sh 'sudo docker push meenakshigadiraju/javaapp1'
+                }
+                
+            }
+        }
+        stage('deploy docker image into the qaservers using ansible')
+        {
+            steps
+            {
+                sh 'ssh ubuntu@172.31.10.244 ansible-playbook deploy_app.yml -b'
+                
+            }
+        }
+        stage('download and execute the selenium scripts')
+        {
+            steps
+            {
+              git 'https://github.com/intelliqittrainings/FunctionalTesting.git'
+              sh 'java -jar testing.jar'
+                
+            }
+        }
+          stage('deploy into kubernetes cluster into prod env')
+        {
+            steps
+            {
+               sh 'ssh ec2-user@172.31.7.137 kubectl apply -f javaapp1-deployment.yml'
+               sh 'ssh ec2-user@172.31.7.137 kubectl apply -f javaapp1-service.yml'
+                
+            }
+        }
+ 
+    }
+}
